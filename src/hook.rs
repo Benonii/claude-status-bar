@@ -1,16 +1,11 @@
 //! Layer A: the hook entry point Claude Code calls.
-//!
-//! Claude Code fires a hook, runs `claude-status-bar hook <event>`, and pipes a
-//! JSON object to our stdin (session_id, cwd, transcript_path, tool_name, …).
-//! We translate that event into an updated `state.json` and/or a `sessions.d`
-//! file. Everything here is OS-agnostic — it is the exact same data pipeline the
-//! macOS app uses, just reimplemented in Rust instead of Node.
+//! OS-agnostic: Implemented with Rust instead of Node
 
 use crate::state::{now_secs, Activity, State};
 use serde_json::Value;
 use std::io::Read;
 
-/// Map a raw Claude Code tool name to a human label (mirrors the original table).
+/// Raw CC tool name => human readable label
 fn tool_label(tool: &str) -> &'static str {
     match tool {
         "Bash" => "Running command",
@@ -25,7 +20,31 @@ fn tool_label(tool: &str) -> &'static str {
     }
 }
 
-/// Sanitize a session id into a safe filename: keep `[A-Za-z0-9._-]`, cap at 64.
+/// Claude Code's whimsical "thinking" verbs. CC picks one of these for its
+/// spinner but never sends it to hooks, so we keep our own copy and pick one
+/// each time a session (re)enters the thinking state — same vibe as the CLI.
+fn thinking_word(seed: &str) -> String {
+    const WORDS: &[&str] = &[
+        "Thinking", "Pondering", "Cogitating", "Ruminating", "Noodling",
+        "Conjuring", "Musing", "Percolating", "Deliberating", "Scheming",
+        "Brewing", "Mulling", "Wrangling", "Reticulating", "Synthesizing",
+        "Marinating", "Simmering", "Stewing", "Churning", "Cooking",
+        "Crafting", "Forging", "Hatching", "Herding", "Hustling",
+        "Ideating", "Inferring", "Manifesting", "Moseying", "Puttering",
+        "Schlepping", "Spinning", "Transmuting", "Vibing", "Working",
+    ];
+    // Cheap entropy: clock nanos mixed with the session id, so concurrent
+    // sessions don't lock-step onto the same word. No rand crate needed.
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos() as usize)
+        .unwrap_or(0);
+    let salt: usize = seed.bytes().map(|b| b as usize).sum();
+    let word = WORDS[(nanos.wrapping_add(salt)) % WORDS.len()];
+    format!("{word}…")
+}
+
+/// Sanitize session id into safe filename
 fn safe_id(raw: &str) -> String {
     let cleaned: String = raw
         .chars()
@@ -39,7 +58,7 @@ fn safe_id(raw: &str) -> String {
     }
 }
 
-/// Read the entire hook payload from stdin, parse as JSON (empty object on error).
+/// Read entire hook payload, parse as JSON
 fn read_payload() -> Value {
     let mut buf = String::new();
     let _ = std::io::stdin().read_to_string(&mut buf);
@@ -50,8 +69,7 @@ fn str_field<'a>(v: &'a Value, key: &str) -> &'a str {
     v.get(key).and_then(Value::as_str).unwrap_or("")
 }
 
-/// Derive a project name from a cwd path (its last path component).
-fn project_from_cwd(cwd: &str) -> String {
+fn project_name_from_cwd(cwd: &str) -> String {
     std::path::Path::new(cwd)
         .file_name()
         .map(|s| s.to_string_lossy().into_owned())
@@ -68,17 +86,17 @@ pub fn run(event: &str) {
     let session_path = crate::paths::session_state_file(&sid);
 
     match event {
-        // ---- session lifecycle: maintain one state file per live session -----
+        // ---- maintain one state file per live session -----
         "session-start" => {
-            let s = State {
+            let state = State {
                 state: Activity::Idle,
-                project: project_from_cwd(cwd),
+                project: project_name_from_cwd(cwd),
                 session_id: session_id.to_string(),
                 transcript: transcript.to_string(),
                 ts: now_secs(),
                 ..Default::default()
             };
-            let _ = s.save_to(&session_path);
+            let _ = state.save_to(&session_path);
             return;
         }
         "session-end" => {
@@ -88,56 +106,53 @@ pub fn run(event: &str) {
         _ => {}
     }
 
-    // ---- activity events: rewrite this session's state, preserving its own ----
-    // sticky fields (timer, project) — loaded from the per-session file, NOT the
-    // shared aggregate, so concurrent sessions don't clobber each other's timers.
-    let prev = State::load_from(&session_path);
-    let mut s = State {
+    // activity events
+    let prev_state = State::load_from(&session_path);
+    let mut new_state = State {
         session_id: if session_id.is_empty() {
-            prev.session_id.clone()
+            prev_state.session_id.clone()
         } else {
             session_id.to_string()
         },
         transcript: if transcript.is_empty() {
-            prev.transcript.clone()
+            prev_state.transcript.clone()
         } else {
             transcript.to_string()
         },
         project: if cwd.is_empty() {
-            prev.project.clone()
+            prev_state.project.clone()
         } else {
-            project_from_cwd(cwd)
+            project_name_from_cwd(cwd)
         },
         ts: now_secs(),
         ..Default::default()
     };
 
     match event {
-        // User submitted a prompt → start of a busy stretch; (re)start the timer.
         "prompt" => {
-            s.state = Activity::Thinking;
-            s.label = "Thinking…".into();
-            s.started_at = now_secs();
+            new_state.state = Activity::Thinking;
+            new_state.label = thinking_word(&sid);
+            new_state.started_at = now_secs();
         }
         // About to run a tool.
         "pre" => {
             let tool = str_field(&payload, "tool_name");
-            s.state = Activity::Tool;
-            s.label = tool_label(tool).into();
-            s.tool = tool.to_string();
+            new_state.state = Activity::Tool;
+            new_state.label = tool_label(tool).into();
+            new_state.tool = tool.to_string();
             // Keep the timer running from the prompt if we already have one.
-            s.started_at = if prev.started_at > 0 {
-                prev.started_at
+            new_state.started_at = if prev_state.started_at > 0 {
+                prev_state.started_at
             } else {
                 now_secs()
             };
         }
         // Tool finished → back to thinking, timer preserved.
         "post" => {
-            s.state = Activity::Thinking;
-            s.label = "Thinking…".into();
-            s.started_at = if prev.started_at > 0 {
-                prev.started_at
+            new_state.state = Activity::Thinking;
+            new_state.label = thinking_word(&sid);
+            new_state.started_at = if prev_state.started_at > 0 {
+                prev_state.started_at
             } else {
                 now_secs()
             };
@@ -146,19 +161,19 @@ pub fn run(event: &str) {
         "notify" => {
             let msg = str_field(&payload, "message").to_lowercase();
             if msg.contains("permission") || msg.contains("approve") {
-                s.state = Activity::Permission;
-                s.label = "Awaiting permission".into();
+                new_state.state = Activity::Permission;
+                new_state.label = "Awaiting permission".into();
             } else {
-                s.state = Activity::Waiting;
-                s.label = "Waiting for you".into();
+                new_state.state = Activity::Waiting;
+                new_state.label = "Waiting for you".into();
             }
-            s.started_at = 0;
+            new_state.started_at = 0;
         }
         // Turn finished.
         "stop" => {
-            s.state = Activity::Done;
-            s.label = "Done".into();
-            s.started_at = 0;
+            new_state.state = Activity::Done;
+            new_state.label = "Done".into();
+            new_state.started_at = 0;
         }
         other => {
             eprintln!("claude-status-bar: unknown hook event '{other}'");
@@ -168,6 +183,6 @@ pub fn run(event: &str) {
 
     // Per-session file feeds the popup's session list; the aggregate feeds the
     // bar (most-recently-active wins, since this event just fired) and the tray.
-    let _ = s.save_to(&session_path);
-    let _ = s.save();
+    let _ = new_state.save_to(&session_path);
+    let _ = new_state.save();
 }
