@@ -10,7 +10,7 @@
 PREFIX  ?= /usr/local
 DESTDIR ?=
 BIN      = claude-status-bar
-PLASMOID = com.abyot.claudestatusbar
+PLASMOID = io.github.benonii.claudestatusbar
 
 BINDIR      = $(DESTDIR)$(PREFIX)/bin
 PLASMOIDDIR = $(DESTDIR)$(PREFIX)/share/plasma/plasmoids/$(PLASMOID)

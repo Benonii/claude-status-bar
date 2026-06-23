@@ -1,4 +1,4 @@
-# Maintainer: benoni <benoni@abyot.com>
+# Maintainer: benoni <besckinder@gmail.com>
 # Builds the Rust binary (Claude Code hooks + `sessions` query + SNI tray fallback)
 # and installs the Plasma 6 panel widget system-wide.
 #

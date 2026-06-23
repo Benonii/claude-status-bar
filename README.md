@@ -136,7 +136,7 @@ it replaces only its own entries). Then start a **new** Claude Code session, sin
 hook changes are picked up only by newly started sessions.
 
 `install-plasmoid.sh` installs the KPackage to
-`~/.local/share/plasma/plasmoids/com.abyot.claudestatusbar/` (baking the absolute
+`~/.local/share/plasma/plasmoids/io.github.benonii.claudestatusbar/` (baking the absolute
 `claude-status-bar sessions` command into the QML) and adds the widget to your
 first panel. It lands at the panel's right end — **drag it where you want** (left,
 for the menu-bar look) via right-click → Enter Edit Mode.
@@ -151,7 +151,7 @@ for the menu-bar look) via right-click → Enter Edit Mode.
 
 ```sh
 ./target/release/claude-status-bar uninstall          # remove hooks
-kpackagetool6 -t Plasma/Applet -r com.abyot.claudestatusbar   # remove widget
+kpackagetool6 -t Plasma/Applet -r io.github.benonii.claudestatusbar   # remove widget
 ```
 
 ## States & appearance

@@ -3,7 +3,7 @@
 # Idempotent: re-running upgrades the package in place.
 set -euo pipefail
 
-ID="com.abyot.claudestatusbar"
+ID="io.github.benonii.claudestatusbar"
 SRC_DIR="$(cd "$(dirname "$0")/../plasmoid" && pwd)"
 
 # Resolve the binary the plasmoid should call: explicit override, then an

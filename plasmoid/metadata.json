@@ -2,11 +2,11 @@
     "KPackageStructure": "Plasma/Applet",
     "KPlugin": {
         "Authors": [
-            { "Email": "benoni@abyot.com", "Name": "benoni" }
+            { "Email": "besckinder@gmail.com", "Name": "benoni" }
         ],
         "Category": "System Information",
         "Description": "Shows Claude Code activity (status + elapsed) in the panel",
-        "Id": "com.abyot.claudestatusbar",
+        "Id": "io.github.benonii.claudestatusbar",
         "License": "MIT",
         "Name": "Claude Status Bar",
         "Version": "1.0"
