@@ -142,24 +142,28 @@ PlasmoidItem {
             anchors.fill: parent
             spacing: Math.round(Kirigami.Units.smallSpacing * 0.75)
 
-            // The Claude creature: walks (legs + eyes dart right) while working,
-            // stands still (frame 0) when idle. Pixel art, scaled with smooth:false.
-            AnimatedSprite {
+            // The Claude spark: spins while working, static when idle.
+            Image {
                 id: logo
-                source: Qt.resolvedUrl("../icons/claude-walk.png")
-                frameCount: 4
-                frameWidth: 13
-                frameHeight: 12
-                frameDuration: 200
-                interpolate: false
-                loops: AnimatedSprite.Infinite
-                running: root.busy
-                smooth: false
+                source: Qt.resolvedUrl("../icons/claude.png")
+                fillMode: Image.PreserveAspectFit
                 Layout.alignment: Qt.AlignVCenter
                 Layout.preferredHeight: comp.iconSize
-                Layout.preferredWidth: Math.round(comp.iconSize * 13 / 12)
+                Layout.preferredWidth: comp.iconSize
+                sourceSize.height: 128
+                smooth: true
                 opacity: root.busy ? 1.0 : (root.quiet ? 0.7 : 0.9)
                 Behavior on opacity { NumberAnimation { duration: 200 } }
+
+                RotationAnimator {
+                    target: logo
+                    running: root.busy
+                    loops: Animation.Infinite
+                    from: 0
+                    to: 360
+                    duration: 4000
+                    onRunningChanged: if (!running) logo.rotation = 0
+                }
             }
 
             PlasmaComponents.Label {
@@ -197,8 +201,7 @@ PlasmoidItem {
             Layout.margins: Kirigami.Units.smallSpacing
             spacing: Kirigami.Units.smallSpacing
             Image {
-                source: Qt.resolvedUrl("../icons/claude-still.png")
-                smooth: false
+                source: Qt.resolvedUrl("../icons/claude.png")
                 sourceSize.height: 22
                 Layout.preferredWidth: 22
                 Layout.preferredHeight: 22
@@ -244,8 +247,7 @@ PlasmoidItem {
                 spacing: Kirigami.Units.smallSpacing
 
                 Image {
-                    source: Qt.resolvedUrl("../icons/claude-still.png")
-                smooth: false
+                    source: Qt.resolvedUrl("../icons/claude.png")
                     sourceSize.height: 18
                     Layout.preferredWidth: 18
                     Layout.preferredHeight: 18
