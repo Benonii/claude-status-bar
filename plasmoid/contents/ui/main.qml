@@ -148,8 +148,8 @@ PlasmoidItem {
                 id: logo
                 source: Qt.resolvedUrl("../icons/claude-walk.png")
                 frameCount: 4
-                frameWidth: 16
-                frameHeight: 14
+                frameWidth: 13
+                frameHeight: 12
                 frameDuration: 200
                 interpolate: false
                 loops: AnimatedSprite.Infinite
@@ -157,7 +157,7 @@ PlasmoidItem {
                 smooth: false
                 Layout.alignment: Qt.AlignVCenter
                 Layout.preferredHeight: comp.iconSize
-                Layout.preferredWidth: Math.round(comp.iconSize * 16 / 14)
+                Layout.preferredWidth: Math.round(comp.iconSize * 13 / 12)
                 opacity: root.busy ? 1.0 : (root.quiet ? 0.7 : 0.9)
                 Behavior on opacity { NumberAnimation { duration: 200 } }
             }
