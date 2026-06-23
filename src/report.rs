@@ -11,6 +11,13 @@ use crate::state::{now_secs, Activity, State};
 /// `session-end` fired) and pruned, so lists never accumulate orphans.
 const STALE_SECS: u64 = 12 * 3600;
 
+/// A session claiming to be busy but silent for this long has almost certainly
+/// had its terminal closed or Claude killed mid-turn (so no `stop`/`session-end`
+/// ever fired). We demote it to idle so a dead session can't pin the bar to a
+/// forever-ticking "Thinking… 35m". A genuine turn fires hooks at every tool
+/// boundary, so this only catches the abandoned ones.
+const BUSY_STALE_SECS: u64 = 10 * 60;
+
 /// Default text glyph standing in for the Claude spark on text-only panels.
 const GLYPH: &str = "✳";
 
@@ -25,10 +32,16 @@ pub fn load_sessions() -> Vec<State> {
             if p.extension().and_then(|s| s.to_str()) != Some("json") {
                 continue;
             }
-            let s = State::load_from(&p);
+            let mut s = State::load_from(&p);
             if s.ts > 0 && now.saturating_sub(s.ts) > STALE_SECS {
                 let _ = std::fs::remove_file(&p);
                 continue;
+            }
+            // Abandoned-but-not-yet-pruned: still a live session, just not busy.
+            if s.state.is_busy() && now.saturating_sub(s.ts) > BUSY_STALE_SECS {
+                s.state = Activity::Idle;
+                s.label = String::new();
+                s.started_at = 0;
             }
             sessions.push(s);
         }
