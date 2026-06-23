@@ -12,6 +12,7 @@ mod hook;
 mod icon;
 mod install;
 mod paths;
+mod report;
 mod state;
 mod tray;
 
@@ -26,7 +27,9 @@ fn main() {
                 std::process::exit(2);
             }
         },
-        Some("sessions") => hook::print_sessions(),
+        Some("sessions") => report::print_sessions(),
+        Some("status") => report::print_status(),
+        Some("waybar") => report::print_waybar(),
         Some("install") => install::install(),
         Some("uninstall") => install::uninstall(),
         Some("--help") | Some("-h") => print_help(),
@@ -42,9 +45,12 @@ fn print_help() {
     println!(
         "claude-status-bar\n\n\
          USAGE:\n\
-         \tclaude-status-bar              run the tray icon (default)\n\
-         \tclaude-status-bar install      register Claude Code hooks + autostart\n\
-         \tclaude-status-bar uninstall    remove hooks + autostart\n\
+         \tclaude-status-bar              run the SNI tray icon (fallback UI)\n\
+         \tclaude-status-bar install      register Claude Code hooks\n\
+         \tclaude-status-bar uninstall    remove hooks\n\
+         \tclaude-status-bar status       one plain-text status line (polybar/i3blocks/…)\n\
+         \tclaude-status-bar waybar       Waybar custom-module JSON\n\
+         \tclaude-status-bar sessions     JSON array of live sessions (KDE plasmoid)\n\
          \tclaude-status-bar hook <evt>   internal: called by Claude Code hooks\n"
     );
 }

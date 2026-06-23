@@ -1,7 +1,24 @@
-# claude-status-bar (Linux / KDE)
+# claude-status-bar (Linux)
 
-Shows Claude Code activity in the KDE Plasma panel, ported from the macOS project
-[m1ckc3s/claude-status-bar](https://github.com/m1ckc3s/claude-status-bar).
+Shows Claude Code activity in your panel / status bar, ported from the macOS
+project [m1ckc3s/claude-status-bar](https://github.com/m1ckc3s/claude-status-bar).
+Best on **KDE Plasma 6** (a real inline panel widget), with first-class support
+for **Waybar** and any script-driven panel (polybar, i3blocks, xfce4-genmon, …),
+and a system-tray fallback everywhere else.
+
+## Quick install (any distro)
+
+```sh
+./install.sh
+```
+
+No root. Builds the binary (needs `cargo`; or ships your own), installs it to
+`~/.local/bin`, wires the Claude Code hooks, and sets up the best UI it can detect
+for your desktop. Then start a **new** Claude Code session.
+
+System-wide / packaging alternatives: `sudo make install` (any distro),
+`makepkg -si` (Arch/Manjaro). See **Desktop support** below and
+[`packaging/panels.md`](packaging/panels.md) for per-panel snippets.
 
 ## Architecture
 
@@ -14,9 +31,13 @@ identical in spirit to the macOS original:
   session keeps its own sticky fields — e.g. its own elapsed-timer start), plus an
   aggregate `state.json` (most-recently-active wins) for the tray fallback. Sticky
   fields are loaded from that session's own file, so concurrent sessions never
-  clobber each other. `claude-status-bar sessions` prints all live sessions as a
-  JSON array (freshest first) for the panel widget. Pure Rust, single binary,
-  links only `libc` (+ `libdbus-1` for the optional tray, below).
+  clobber each other. Pure Rust, single binary, links only `libc`
+  (+ `libdbus-1` for the optional tray, below).
+- **Reporting commands (the portability layer).** The same session data is read
+  out in whatever format a consumer wants:
+  - `claude-status-bar sessions` → JSON array (KDE plasmoid)
+  - `claude-status-bar status` → one plain-text line (polybar, i3blocks, genmon, …)
+  - `claude-status-bar waybar` → Waybar JSON (`text`/`tooltip`/`class`)
 - **Layer B — UI. Two options, both read the same `state.json`:**
   - **Plasma panel widget (recommended)** — a QML plasmoid in `plasmoid/`. Shows
     the Claude spark **plus an always-visible status label** ("Editing  43s") at
@@ -62,11 +83,32 @@ wire-compatible):
 | `plasmoid/contents/icons/claude.png` | the Claude spark asset |
 | `scripts/install-plasmoid.sh`   | deploy plasmoid + add to panel |
 
-## Requirements
+## Desktop support
 
-- Rust toolchain (build) and `dbus` (runtime).
-- KDE Plasma 6 for the panel widget. Tray fallback also works on XFCE/Cinnamon/MATE;
-  on GNOME install the `gnome-shell-extension-appindicator` extension first.
+Portability is by **desktop environment**, not distro — the binary builds and the
+hooks run on Arch, Debian/Ubuntu, Fedora, openSUSE, etc. all the same. What differs
+is how the status is shown:
+
+| Environment | How | Inline text? |
+|-------------|-----|--------------|
+| **KDE Plasma 6** (any distro) | native panel widget (plasmoid) | ✅ yes — full experience, multi-session popup |
+| **Waybar** (sway/Hyprland/wlroots) | `custom/claude` module → `claude-status-bar waybar` | ✅ yes |
+| **polybar / i3blocks / xfce4-genmon / tint2 / dwmblocks / eww** | run `claude-status-bar status` on a 1 s timer | ✅ yes |
+| **XFCE / Cinnamon / MATE / LXQt / Budgie** | system-tray icon, or a script panel above | tray: tooltip only |
+| **GNOME** (Ubuntu/Fedora default) | tray via `AppIndicator` extension | tooltip only* |
+| KDE Plasma **5** | tray fallback only (plasmoid needs Plasma 6) | tooltip only |
+
+\* GNOME's top bar can't host arbitrary inline-text applets without a custom GNOME
+Shell extension. Snippets for every panel are in
+[`packaging/panels.md`](packaging/panels.md).
+
+Requirements: a Rust toolchain to build (or a prebuilt binary), `dbus` only for the
+tray fallback, and Claude Code itself. No Node.
+
+## Requirements (build)
+
+- `cargo` / Rust (Arch: `rust`; Debian/Ubuntu: `cargo`; Fedora: `cargo`).
+- `dbus` at runtime if you use the tray fallback; KDE/Waybar/script panels don't need it.
 
 ## Install via package (Arch / Manjaro)
 
@@ -95,9 +137,9 @@ hook changes are picked up only by newly started sessions.
 
 `install-plasmoid.sh` installs the KPackage to
 `~/.local/share/plasma/plasmoids/com.abyot.claudestatusbar/` (baking the absolute
-`state.json` path into the QML) and adds the widget to your first panel. It lands
-at the panel's right end — **drag it where you want** (left, for the menu-bar look)
-via right-click → Enter Edit Mode.
+`claude-status-bar sessions` command into the QML) and adds the widget to your
+first panel. It lands at the panel's right end — **drag it where you want** (left,
+for the menu-bar look) via right-click → Enter Edit Mode.
 
 ## Tray fallback (non-KDE)
 

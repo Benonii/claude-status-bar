@@ -5,7 +5,16 @@ set -euo pipefail
 
 ID="com.abyot.claudestatusbar"
 SRC_DIR="$(cd "$(dirname "$0")/../plasmoid" && pwd)"
-BIN="$(cd "$(dirname "$0")/.." && pwd)/target/release/claude-status-bar"
+
+# Resolve the binary the plasmoid should call: explicit override, then an
+# installed copy on PATH, then the repo's release build.
+if [ -n "${CSB_BIN:-}" ]; then
+    BIN="$CSB_BIN"
+elif command -v claude-status-bar >/dev/null 2>&1; then
+    BIN="$(command -v claude-status-bar)"
+else
+    BIN="$(cd "$(dirname "$0")/.." && pwd)/target/release/claude-status-bar"
+fi
 SESSIONS_CMD="$BIN sessions"
 
 # Stage a copy with the absolute 'sessions' command baked in and the spark bundled.

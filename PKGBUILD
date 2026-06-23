@@ -27,18 +27,9 @@ build() {
 
 package() {
     cd "$startdir"
-
-    # Rust binary: `hook`, `sessions`, `install`/`uninstall`, and the tray fallback.
-    install -Dm755 "target/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
-
-    # Plasma 6 plasmoid, with the absolute `sessions` command baked into the QML
-    # (replaces the __SESSIONS_CMD__ placeholder that the dev script substitutes).
-    local pdir="$pkgdir/usr/share/plasma/plasmoids/com.abyot.claudestatusbar"
-    install -Dm644 plasmoid/metadata.json            "$pdir/metadata.json"
-    install -Dm644 plasmoid/contents/ui/main.qml     "$pdir/contents/ui/main.qml"
-    install -Dm644 plasmoid/contents/icons/claude.png "$pdir/contents/icons/claude.png"
-    sed -i "s|__SESSIONS_CMD__|/usr/bin/$pkgname sessions|g" "$pdir/contents/ui/main.qml"
-
-    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
-    install -Dm644 LICENSE   "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    # The Makefile bakes /usr/bin/claude-status-bar into the plasmoid's QML and
+    # lays out binary + plasmoid + docs + license under $pkgdir.
+    make install PREFIX=/usr DESTDIR="$pkgdir"
+    # Panel-config snippets for non-KDE desktops.
+    install -Dm644 packaging/panels.md "$pkgdir/usr/share/doc/$pkgname/panels.md"
 }

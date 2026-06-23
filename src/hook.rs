@@ -58,33 +58,6 @@ fn project_from_cwd(cwd: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Print all live sessions as a JSON array (freshest first) on stdout.
-/// The plasmoid polls this to render the per-session list in its popup.
-/// Sessions whose last event is older than 12h are treated as crashed (no
-/// `session-end` fired) and pruned, so the list never accumulates orphans.
-pub fn print_sessions() {
-    const STALE_SECS: u64 = 12 * 3600;
-    let now = now_secs();
-    let dir = crate::paths::sessions_dir();
-    let mut sessions: Vec<State> = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(&dir) {
-        for entry in entries.flatten() {
-            let p = entry.path();
-            if p.extension().and_then(|s| s.to_str()) != Some("json") {
-                continue;
-            }
-            let s = State::load_from(&p);
-            if s.ts > 0 && now.saturating_sub(s.ts) > STALE_SECS {
-                let _ = std::fs::remove_file(&p);
-                continue;
-            }
-            sessions.push(s);
-        }
-    }
-    sessions.sort_by(|a, b| b.ts.cmp(&a.ts)); // freshest first
-    println!("{}", serde_json::to_string(&sessions).unwrap_or_else(|_| "[]".into()));
-}
-
 pub fn run(event: &str) {
     let payload = read_payload();
     let session_id = str_field(&payload, "session_id");
