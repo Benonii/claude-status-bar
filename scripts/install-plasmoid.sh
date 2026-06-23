@@ -22,8 +22,6 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 cp -r "$SRC_DIR/." "$TMP/"
 sed -i "s|__SESSIONS_CMD__|$SESSIONS_CMD|g" "$TMP/contents/ui/main.qml"
-mkdir -p "$TMP/contents/icons"
-[ -f "$HOME/.claude/claude-icon.png" ] && cp "$HOME/.claude/claude-icon.png" "$TMP/contents/icons/claude.png"
 
 # Install or upgrade the KPackage.
 if kpackagetool6 -t Plasma/Applet -l 2>/dev/null | grep -qx "$ID"; then

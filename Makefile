@@ -27,9 +27,11 @@ build:
 # Binary + the KDE plasmoid (with the installed binary path baked into the QML).
 install: build
 	install -Dm755 target/release/$(BIN) $(BINDIR)/$(BIN)
-	install -Dm644 plasmoid/metadata.json            $(PLASMOIDDIR)/metadata.json
-	install -Dm644 plasmoid/contents/ui/main.qml     $(PLASMOIDDIR)/contents/ui/main.qml
-	install -Dm644 plasmoid/contents/icons/claude.png $(PLASMOIDDIR)/contents/icons/claude.png
+	install -Dm644 plasmoid/metadata.json                  $(PLASMOIDDIR)/metadata.json
+	install -Dm644 plasmoid/contents/ui/main.qml           $(PLASMOIDDIR)/contents/ui/main.qml
+	install -Dm644 plasmoid/contents/icons/claude.png      $(PLASMOIDDIR)/contents/icons/claude.png
+	install -Dm644 plasmoid/contents/icons/claude-walk.png  $(PLASMOIDDIR)/contents/icons/claude-walk.png
+	install -Dm644 plasmoid/contents/icons/claude-still.png $(PLASMOIDDIR)/contents/icons/claude-still.png
 	sed -i "s|__SESSIONS_CMD__|$(PREFIX)/bin/$(BIN) sessions|g" $(PLASMOIDDIR)/contents/ui/main.qml
 	install -Dm644 README.md $(DOCDIR)/README.md
 	install -Dm644 LICENSE   $(LICENSEDIR)/LICENSE
