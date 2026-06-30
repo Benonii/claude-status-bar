@@ -6,7 +6,7 @@
 //! a frame counter so the icon animates. Each tick pushes the current snapshot
 //! into the tray via `handle.update`, which makes ksni re-query our `Tray` impl.
 
-use crate::icon::{spark, Rgb};
+use crate::icon::{Rgb, spark};
 use crate::state::{Activity, State};
 use ksni::menu::{MenuItem, StandardItem};
 use ksni::{Tray, TrayService};

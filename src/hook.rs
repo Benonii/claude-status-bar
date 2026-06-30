@@ -1,7 +1,7 @@
 //! Layer A: the hook entry point Claude Code calls.
 //! OS-agnostic: Implemented with Rust instead of Node
 
-use crate::state::{now_secs, Activity, State};
+use crate::state::{Activity, State, now_secs};
 use serde_json::Value;
 use std::io::Read;
 
@@ -20,27 +20,24 @@ fn tool_label(tool: &str) -> &'static str {
     }
 }
 
-/// Claude Code's whimsical "thinking" verbs. CC picks one of these for its
-/// spinner but never sends it to hooks, so we keep our own copy and pick one
-/// each time a session (re)enters the thinking state — same vibe as the CLI.
 fn thinking_word(seed: &str) -> String {
-    const WORDS: &[&str] = &[
+    #[rustfmt::skip]
+    let words = [
         "Thinking", "Pondering", "Cogitating", "Ruminating", "Noodling",
         "Conjuring", "Musing", "Percolating", "Deliberating", "Scheming",
         "Brewing", "Mulling", "Wrangling", "Reticulating", "Synthesizing",
         "Marinating", "Simmering", "Stewing", "Churning", "Cooking",
         "Crafting", "Forging", "Hatching", "Herding", "Hustling",
         "Ideating", "Inferring", "Manifesting", "Moseying", "Puttering",
-        "Schlepping", "Spinning", "Transmuting", "Vibing", "Working",
+        "Schlepping", "Spinning", "Transmuting", "Vibing", "Working", "Beno-ing",
     ];
-    // Cheap entropy: clock nanos mixed with the session id, so concurrent
-    // sessions don't lock-step onto the same word. No rand crate needed.
+    // Cheap entropy: clock nanos mixed with the session ids
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.subsec_nanos() as usize)
         .unwrap_or(0);
     let salt: usize = seed.bytes().map(|b| b as usize).sum();
-    let word = WORDS[(nanos.wrapping_add(salt)) % WORDS.len()];
+    let word = words[(nanos.wrapping_add(salt)) % words.len()];
     format!("{word}…")
 }
 
@@ -86,7 +83,7 @@ pub fn run(event: &str) {
     let session_path = crate::paths::session_state_file(&sid);
 
     match event {
-        // ---- maintain one state file per live session -----
+        // maintain one state file per live session
         "session-start" => {
             let state = State {
                 state: Activity::Idle,

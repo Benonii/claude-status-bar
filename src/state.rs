@@ -27,7 +27,6 @@ impl Activity {
     pub fn is_busy(self) -> bool {
         matches!(self, Activity::Thinking | Activity::Tool)
     }
-
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

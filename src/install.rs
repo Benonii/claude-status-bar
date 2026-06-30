@@ -2,7 +2,7 @@
 //! up a KDE autostart entry. The merge is additive and idempotent — it backs the
 //! file up first and never disturbs hooks it didn't create.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 /// (Claude Code event name, our `hook` subcommand argument).
 const EVENTS: &[(&str, &str)] = &[
@@ -18,8 +18,8 @@ const EVENTS: &[(&str, &str)] = &[
 fn exe_path() -> String {
     std::env::current_exe()
         .ok()
-        .and_then(|p| p.canonicalize().ok())
-        .map(|p| p.to_string_lossy().into_owned())
+        .and_then(|path| path.canonicalize().ok())
+        .map(|path| path.to_string_lossy().into_owned())
         .unwrap_or_else(|| "claude-status-bar".into())
 }
 

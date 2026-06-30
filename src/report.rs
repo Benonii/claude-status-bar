@@ -5,7 +5,7 @@
 //! command on an interval (polybar, i3blocks, xfce4-genmon, tint2, …) can use
 //! `status`.
 
-use crate::state::{now_secs, Activity, State};
+use crate::state::{Activity, State, now_secs};
 
 /// A session whose last event is older than this is treated as crashed (no
 /// `session-end` fired) and pruned, so lists never accumulate orphans.
