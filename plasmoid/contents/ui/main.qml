@@ -12,6 +12,8 @@
 //
 // __SESSIONS_CMD__ is replaced at install time with "/abs/path/claude-status-bar sessions".
 
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.plasmoid
@@ -111,7 +113,8 @@ PlasmoidItem {
     }
 
     Timer {
-        interval: 500
+        // Fast cadence (sub-second). back off on idle panel
+        interval: (root.busy || root.expanded) ? 500 : 2500
         running: true
         repeat: true
         triggeredOnStart: true
@@ -129,13 +132,27 @@ PlasmoidItem {
         readonly property int iconSize: Math.round(Math.max(15, thickness * 0.72))
         readonly property int fontSize: Math.round(Math.max(10, thickness * 0.38))
 
-        implicitWidth: rowLayout.implicitWidth
+        // Cap how wide the bar can grow
+        readonly property int maxWidth: Kirigami.Units.gridUnit * 16
+
+        implicitWidth: Math.min(rowLayout.implicitWidth, maxWidth)
         implicitHeight: horizontal ? thickness : rowLayout.implicitHeight
-        Layout.minimumWidth: rowLayout.implicitWidth
-        Layout.preferredWidth: rowLayout.implicitWidth
+        Layout.minimumWidth: Math.min(rowLayout.implicitWidth, maxWidth)
+        Layout.preferredWidth: Math.min(rowLayout.implicitWidth, maxWidth)
+        Layout.maximumWidth: maxWidth
 
         acceptedButtons: Qt.LeftButton
         onClicked: root.expanded = !root.expanded
+
+        // Screen-reader / keyboard access
+        activeFocusOnTab: true
+        Accessible.role: Accessible.Button
+        Accessible.name: root.displayText.length ? root.displayText : "Claude status"
+        Accessible.description: "Toggle the Claude sessions popup"
+        Accessible.onPressAction: root.expanded = !root.expanded
+        Keys.onSpacePressed: root.expanded = !root.expanded
+        Keys.onReturnPressed: root.expanded = !root.expanded
+        Keys.onEnterPressed: root.expanded = !root.expanded
 
         RowLayout {
             id: rowLayout
@@ -147,6 +164,7 @@ PlasmoidItem {
                 id: logo
                 source: Qt.resolvedUrl("../icons/claude.png")
                 fillMode: Image.PreserveAspectFit
+                Accessible.ignored: true // state is announced via the button name
                 Layout.alignment: Qt.AlignVCenter
                 Layout.preferredHeight: comp.iconSize
                 Layout.preferredWidth: comp.iconSize
@@ -171,6 +189,7 @@ PlasmoidItem {
                 text: root.displayText
                 visible: text.length > 0
                 Layout.alignment: Qt.AlignVCenter
+                Layout.fillWidth: true
                 verticalAlignment: Text.AlignVCenter
                 elide: Text.ElideRight
                 maximumLineCount: 1
@@ -214,24 +233,21 @@ PlasmoidItem {
             }
             PlasmaComponents.Label {
                 text: root.sessions.length
-                opacity: 0.6
+                color: Kirigami.Theme.disabledTextColor
                 visible: root.sessions.length > 1
             }
         }
 
-        Rectangle {
+        Kirigami.Separator {
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: Kirigami.Units.smallSpacing
-            height: 1
-            color: Kirigami.Theme.textColor
-            opacity: 0.15
         }
 
         PlasmaComponents.Label {
             visible: root.sessions.length === 0
             text: "No active sessions"
-            opacity: 0.6
+            color: Kirigami.Theme.disabledTextColor
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
             horizontalAlignment: Text.AlignHCenter
@@ -241,10 +257,16 @@ PlasmoidItem {
         Repeater {
             model: root.sessions
             delegate: RowLayout {
+                id: sessionRow
                 required property var modelData
                 Layout.fillWidth: true
                 Layout.margins: Kirigami.Units.smallSpacing
                 spacing: Kirigami.Units.smallSpacing
+
+                // One spoken line per session: "<project>, <activity>".
+                Accessible.role: Accessible.StaticText
+                Accessible.name: (sessionRow.modelData.project ? sessionRow.modelData.project : "Claude")
+                                 + ", " + root.sessActivity(sessionRow.modelData)
 
                 Image {
                     source: Qt.resolvedUrl("../icons/claude.png")
@@ -252,21 +274,22 @@ PlasmoidItem {
                     Layout.preferredWidth: 18
                     Layout.preferredHeight: 18
                     Layout.alignment: Qt.AlignTop
-                    opacity: root.isBusy(modelData) ? 1.0
-                             : (root.needsUser(modelData) ? 0.9 : 0.55)
+                    Accessible.ignored: true
+                    opacity: root.isBusy(sessionRow.modelData) ? 1.0
+                             : (root.needsUser(sessionRow.modelData) ? 0.9 : 0.55)
                 }
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 0
                     PlasmaComponents.Label {
-                        text: modelData.project ? modelData.project : "Claude"
+                        text: sessionRow.modelData.project ? sessionRow.modelData.project : "Claude"
                         font.bold: true
                         Layout.fillWidth: true
                         elide: Text.ElideMiddle
                     }
                     PlasmaComponents.Label {
-                        text: root.sessActivity(modelData)
-                        opacity: 0.7
+                        text: root.sessActivity(sessionRow.modelData)
+                        color: Kirigami.Theme.disabledTextColor
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         Layout.fillWidth: true
                         elide: Text.ElideRight
