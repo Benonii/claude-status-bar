@@ -1,74 +1,59 @@
-//! Procedural icon rendering. We draw the "spark" directly into an ARGB32 buffer
-//! every frame instead of shipping PNG assets, so animation is just maths.
+//! Tray icon rendering. We render the *same* Claude spark the KDE plasmoid shows
+//! (`plasmoid/contents/icons/claude.png`, embedded at build time), so the icon is
+//! identical across every desktop — tray, panel, everywhere. State is conveyed by
+//! overall opacity (and the tooltip/menu text), never by changing the icon's shape
+//! or colour.
 //!
 //! Pixel format required by the StatusNotifierItem spec (and ksni): ARGB32 in
 //! network byte order, i.e. each pixel is 4 bytes laid out `[A, R, G, B]`.
 
-#[derive(Clone, Copy)]
-pub struct Rgb(pub u8, pub u8, pub u8);
+use image::imageops::FilterType;
+use std::sync::OnceLock;
 
-fn lerp_u8(from: u8, to: u8, t: f32) -> u8 {
-    let t = t.clamp(0.0, 1.0);
-    (from as f32 + (to as f32 - from as f32) * t).round() as u8
+/// The canonical Claude spark, baked into the binary so the tray needs no asset
+/// files on disk and stays byte-identical to the plasmoid's icon.
+const CLAUDE_PNG: &[u8] = include_bytes!("../plasmoid/contents/icons/claude.png");
+
+/// Decode + scale the spark to `size` once, caching the straight-alpha RGBA bytes.
+/// The tray only ever asks for one size, so a single-slot cache is plenty.
+fn base_rgba(size: u32) -> &'static [u8] {
+    static CACHE: OnceLock<Vec<u8>> = OnceLock::new();
+    CACHE
+        .get_or_init(|| {
+            image::load_from_memory(CLAUDE_PNG)
+                .expect("embedded claude.png must decode")
+                .resize_exact(size, size, FilterType::Lanczos3)
+                .to_rgba8()
+                .into_raw()
+        })
+        .as_slice()
 }
 
-/// Render a four-pointed sparkle.
-///
-/// * `size`   – icon edge length in px (square).
-/// * `color`  – arm colour.
-/// * `extent` – how far the arms reach (animate this to "pulse").
-/// * `alpha`  – overall opacity 0.0–1.0 (animate this to "breathe").
-///
-/// The star shape is the level set of `sqrt(|dx|) + sqrt(|dy|) <= extent`, an
-/// astroid-like curve whose concave sides read as a sparkle. A small bright core
-/// is blended in and whitened for a touch of glow.
-pub fn spark(size: i32, color: Rgb, extent: f32, alpha: f32) -> ksni::Icon {
-    let (w, h) = (size, size);
-    let cx = (w as f32 - 1.0) / 2.0;
-    let cy = (h as f32 - 1.0) / 2.0;
-    let aa = 0.7_f32; // anti-alias falloff width, in shape-function units
-    let core_r = size as f32 * 0.11;
+/// Render the Claude spark at `size` px, scaling every pixel's alpha by `alpha`
+/// (0.0–1.0) so callers can dim it when idle or pulse it when busy.
+pub fn claude_icon(size: i32, alpha: f32) -> ksni::Icon {
+    let s = size.max(1) as u32;
+    let rgba = base_rgba(s); // [R, G, B, A] per pixel
+    let mul = alpha.clamp(0.0, 1.0);
 
-    let mut data = vec![0u8; (w * h * 4) as usize];
-
-    for y in 0..h {
-        for x in 0..w {
-            let dx = (x as f32 - cx).abs();
-            let dy = (y as f32 - cy).abs();
-
-            // Star body with a soft edge.
-            let f = dx.sqrt() + dy.sqrt();
-            let star = if f <= extent {
-                1.0
-            } else {
-                (1.0 - (f - extent) / aa).max(0.0)
-            };
-
-            // Round bright core.
-            let r = (dx * dx + dy * dy).sqrt();
-            let core = (1.0 - r / core_r).clamp(0.0, 1.0);
-
-            let cov = star.max(core);
-            if cov <= 0.0 {
-                continue;
-            }
-
-            let rr = lerp_u8(color.0, 255, 0.7 * core);
-            let gg = lerp_u8(color.1, 255, 0.7 * core);
-            let bb = lerp_u8(color.2, 255, 0.7 * core);
-            let a = (cov * alpha * 255.0).round().clamp(0.0, 255.0) as u8;
-
-            let idx = ((y * w + x) * 4) as usize;
-            data[idx] = a;
-            data[idx + 1] = rr;
-            data[idx + 2] = gg;
-            data[idx + 3] = bb;
-        }
+    let mut data = vec![0u8; (s * s * 4) as usize];
+    for px in 0..(s * s) as usize {
+        let (r, g, b, a) = (
+            rgba[px * 4],
+            rgba[px * 4 + 1],
+            rgba[px * 4 + 2],
+            rgba[px * 4 + 3],
+        );
+        let i = px * 4;
+        data[i] = (a as f32 * mul).round() as u8; // A
+        data[i + 1] = r;
+        data[i + 2] = g;
+        data[i + 3] = b;
     }
 
     ksni::Icon {
-        width: w,
-        height: h,
+        width: s as i32,
+        height: s as i32,
         data,
     }
 }

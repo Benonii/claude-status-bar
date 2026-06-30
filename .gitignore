@@ -2,3 +2,8 @@
 /pkg
 *.pkg.tar.zst
 *.pkg.tar.*
+
+# Screen recordings used to make docs/screenshots/demo.gif (the GIF itself is tracked)
+*.mp4
+*.webm
+*.mkv

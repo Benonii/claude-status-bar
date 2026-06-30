@@ -6,7 +6,7 @@
 //! a frame counter so the icon animates. Each tick pushes the current snapshot
 //! into the tray via `handle.update`, which makes ksni re-query our `Tray` impl.
 
-use crate::icon::{Rgb, spark};
+use crate::icon::claude_icon;
 use crate::state::{Activity, State};
 use ksni::menu::{MenuItem, StandardItem};
 use ksni::{Tray, TrayService};
@@ -14,40 +14,27 @@ use std::time::{Duration, SystemTime};
 
 const ICON_SIZE: i32 = 22;
 
-// Anthropic orange and the alert yellow used for permission/idle states.
-const ORANGE: Rgb = Rgb(217, 119, 87);
-const YELLOW: Rgb = Rgb(230, 180, 0);
-const MUTED: Rgb = Rgb(150, 150, 162);
-
 #[derive(Default)]
 struct StatusTray {
     state: State,
     frame: u64,
 }
 
-/// Map (activity, frame) → (colour, arm extent, alpha). All animation lives here.
-fn appearance(state: &State, frame: u64) -> (Rgb, f32, f32) {
+/// Map (activity, frame) → icon opacity. The Claude spark itself never changes;
+/// only how brightly it shows. Busy pulses, permission blinks, idle dims.
+fn icon_alpha(state: &State, frame: u64) -> f32 {
     // Oscillator in 0..1; `speed` sets the period.
     let osc = |speed: f32| ((frame as f32 * speed).sin() + 1.0) / 2.0;
 
     match state.state {
-        // Working: brisk orange pulse (tool use a little faster than thinking).
-        Activity::Tool => {
-            let o = osc(0.8);
-            (ORANGE, 2.95 + 0.30 * o, 0.78 + 0.22 * o)
-        }
-        Activity::Thinking => {
-            let o = osc(0.5);
-            (ORANGE, 2.95 + 0.25 * o, 0.78 + 0.22 * o)
-        }
-        // Blocked on the user: slow yellow blink to draw the eye.
-        Activity::Permission => {
-            let o = osc(0.45);
-            (YELLOW, 3.05, 0.35 + 0.65 * o)
-        }
-        Activity::Waiting => (YELLOW, 3.0, 0.6),
+        // Working: brisk bright pulse (tool use a little faster than thinking).
+        Activity::Tool => 0.80 + 0.20 * osc(0.8),
+        Activity::Thinking => 0.82 + 0.18 * osc(0.5),
+        // Blocked on the user: slow blink to draw the eye.
+        Activity::Permission => 0.35 + 0.65 * osc(0.45),
+        Activity::Waiting => 0.7,
         // Nothing happening: dim, static.
-        Activity::Idle | Activity::Done => (MUTED, 2.85, 0.45),
+        Activity::Idle | Activity::Done => 0.55,
     }
 }
 
@@ -85,8 +72,7 @@ impl Tray for StatusTray {
     }
 
     fn icon_pixmap(&self) -> Vec<ksni::Icon> {
-        let (color, extent, alpha) = appearance(&self.state, self.frame);
-        vec![spark(ICON_SIZE, color, extent, alpha)]
+        vec![claude_icon(ICON_SIZE, icon_alpha(&self.state, self.frame))]
     }
 
     fn tool_tip(&self) -> ksni::ToolTip {

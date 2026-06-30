@@ -6,19 +6,65 @@ Best on **KDE Plasma 6** (a real inline panel widget), with first-class support
 for **Waybar** and any script-driven panel (polybar, i3blocks, xfce4-genmon, …),
 and a system-tray fallback everywhere else.
 
-## Quick install (any distro)
+![The panel widget tracking a Claude session live — activity label and timer updating across multiple sessions](docs/screenshots/demo.gif)
+
+## Install
+
+**Arch / Manjaro** — system-wide package:
 
 ```sh
-./install.sh
+makepkg -si                 # builds + installs the binary and plasmoid
+claude-status-bar install   # wire the Claude Code hooks (per-user)
 ```
 
-No root. Builds the binary (needs `cargo`; or ships your own), installs it to
-`~/.local/bin`, wires the Claude Code hooks, and sets up the best UI it can detect
-for your desktop. Then start a **new** Claude Code session.
+**Any other distro** (Debian/Ubuntu, Fedora, openSUSE, …) — no root:
 
-System-wide / packaging alternatives: `sudo make install` (any distro),
-`makepkg -si` (Arch/Manjaro). See **Desktop support** below and
-[`packaging/panels.md`](packaging/panels.md) for per-panel snippets.
+```sh
+./install.sh                # builds → ~/.local/bin, wires hooks, sets up the
+                            # best UI it can detect for your desktop
+```
+
+Then start a **new** Claude Code session. System-wide without a package manager:
+`sudo make install PREFIX=/usr`. Make sure the [dependencies](#dependencies) below
+are present first. Per-panel snippets: [`packaging/panels.md`](packaging/panels.md).
+
+## Dependencies
+
+**Build (strict):**
+
+- Rust toolchain (`cargo`).
+- `pkg-config` + libdbus development headers — the binary always links `libdbus-1`
+  for the tray (`ksni`), so they're required even on KDE. By distro:
+  - **Arch / Manjaro:** `dbus` (part of the base system — already present)
+  - **Debian / Ubuntu:** `libdbus-1-dev pkg-config`
+  - **Fedora / RHEL:** `dbus-devel pkgconf-pkg-config`
+  - **openSUSE:** `dbus-1-devel pkg-config`
+
+**Runtime (strict):**
+
+- Claude Code.
+- A running D-Bus session bus (standard on every Linux desktop) — used only by the
+  tray fallback.
+- **KDE only:** `plasma-workspace` (provides the panel host and the
+  `plasma5support` datasource the widget reads through).
+
+No Node, no Python, no web runtime.
+
+## Screenshots
+
+The **KDE Plasma 6 panel widget** puts the project, current activity and a live
+timer inline in your panel — like the macOS menu bar — with a `+N` badge when
+other Claude sessions are running:
+
+<img src="docs/screenshots/plasma-bar.png" alt="Plasma 6 panel widget showing 'web-frontend · Editing 43s  +2'" height="36">
+
+Click it for a popup listing **every live session** with its project, activity and
+elapsed time (the busiest one drives the bar):
+
+<img src="docs/screenshots/plasma-popup.png" alt="Popup listing multiple Claude sessions with per-session activity and timers" height="250">
+
+> Regenerate these any time with [`scripts/demo-pose.sh`](scripts/demo-pose.sh) —
+> see [`docs/screenshots/README.md`](docs/screenshots/README.md).
 
 ## Architecture
 
@@ -46,10 +92,11 @@ identical in spirit to the macOS original:
     every session** (project · activity · timer). The popup width auto-matches the
     bar.
   - **System-tray icon (fallback, `claude-status-bar` with no subcommand)** — a
-    Rust `ksni`/StatusNotifierItem indicator. Works on any SNI host (XFCE, etc.),
-    but a tray icon **cannot show inline text** (SNI has no such field) — the
-    status is only in the hover tooltip. Use this only off KDE/where a panel
-    widget isn't an option.
+    Rust `ksni`/StatusNotifierItem indicator showing the **same Claude spark as the
+    panel** (the real `claude.png`, dimmed when idle and brighter/pulsing when
+    busy). Works on any SNI host (XFCE, etc.), but a tray icon **cannot show inline
+    text** (SNI has no such field) — the status text is only in the hover tooltip.
+    Use this only off KDE/where a panel widget isn't an option.
 
 `state.json` schema (field names match the macOS app, so the two are
 wire-compatible):
@@ -75,7 +122,7 @@ wire-compatible):
 | `src/paths.rs`   | filesystem locations |
 | `src/state.rs`   | `state.json` schema, atomic load/save, elapsed timer |
 | `src/hook.rs`    | Layer A — event → state translation, session tracking |
-| `src/icon.rs`    | procedural ARGB32 "spark" rendering for the tray fallback |
+| `src/icon.rs`    | decode/scale the embedded `claude.png` into the tray pixmap (same icon as the plasmoid) |
 | `src/tray.rs`    | Layer B fallback — ksni `Tray` impl + animation/reload loop |
 | `src/install.rs` | additive `settings.json` hook merge |
 | `plasmoid/metadata.json`        | Plasma 6 applet manifest |
@@ -101,14 +148,6 @@ is how the status is shown:
 \* GNOME's top bar can't host arbitrary inline-text applets without a custom GNOME
 Shell extension. Snippets for every panel are in
 [`packaging/panels.md`](packaging/panels.md).
-
-Requirements: a Rust toolchain to build (or a prebuilt binary), `dbus` only for the
-tray fallback, and Claude Code itself. No Node.
-
-## Requirements (build)
-
-- `cargo` / Rust (Arch: `rust`; Debian/Ubuntu: `cargo`; Fedora: `cargo`).
-- `dbus` at runtime if you use the tray fallback; KDE/Waybar/script panels don't need it.
 
 ## Install via package (Arch / Manjaro)
 
@@ -147,6 +186,12 @@ for the menu-bar look) via right-click → Enter Edit Mode.
 ./target/release/claude-status-bar &   # StatusNotifierItem tray icon (tooltip only)
 ```
 
+The same Claude spark as the panel appears in the system tray (here, second from
+left), dimmed when idle and brighter/pulsing when busy — status text is in the
+hover tooltip:
+
+<img src="docs/screenshots/tray.png" alt="Claude spark in the system tray alongside other tray icons" height="34">
+
 ## Uninstall
 
 ```sh
@@ -156,7 +201,9 @@ kpackagetool6 -t Plasma/Applet -r io.github.benonii.claudestatusbar   # remove w
 
 ## States & appearance
 
-The icon is the Claude spark: it spins while Claude is working, static when idle.
+The icon is the Claude spark. In the **panel widget** it spins while Claude works
+and is static when idle; the **tray** shows the same spark, brighter/pulsing when
+busy and dimmed when idle.
 
 | state        | trigger (hook)        | panel widget |
 |--------------|-----------------------|--------------|
